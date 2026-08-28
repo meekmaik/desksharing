@@ -117,6 +117,14 @@ export default function App() {
     return RESOURCES.filter((r) => !r.timeBased && bookingsForSelectedDate[r.id]?.length).length;
   }, [bookingsForSelectedDate]);
 
+  // Eigene ganztägige Buchung an diesem Tag (Besprechungsraum zählt nicht,
+  // da zeitbasiert / start_time gesetzt).
+  const myFullDayBookingToday = useMemo(() => {
+    return allBookings.find(
+      (b) => b.user_id === myUserId && b.date === selectedDateKey && b.start_time === null
+    );
+  }, [allBookings, myUserId, selectedDateKey]);
+
   const openResource = (resource) => {
     setError(null);
     if (resource.timeBased) {
@@ -289,6 +297,11 @@ export default function App() {
           dateKey={selectedDateKey}
           horizon={horizon}
           existingBooking={modal.existing}
+          myExistingElsewhere={
+            myFullDayBookingToday && myFullDayBookingToday.resource_id !== modal.resource.id
+              ? myFullDayBookingToday
+              : null
+          }
           myUserId={myUserId}
           myName={displayName}
           busy={busy}

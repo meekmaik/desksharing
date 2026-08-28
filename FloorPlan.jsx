@@ -8,14 +8,13 @@ function resourceStatus(bookings, resourceId, myUserId) {
   return { status: mine ? "mine" : "booked", entries };
 }
 
-function DeskGroup({ groupId, label, count, bookings, myUserId, onSelect, flex }) {
+function DeskGroup({ groupId, count, bookings, myUserId, onSelect, flex }) {
   const ids =
     count > 1
       ? Array.from({ length: count }, (_, i) => `${groupId}-${i + 1}`)
       : [groupId];
   return (
     <div className="group-box" style={{ flex }}>
-      <div className="group-label">{label}</div>
       <div className="desk-grid">
         {ids.map((id) => {
           const { status, entries } = resourceStatus(bookings, id, myUserId);
@@ -43,25 +42,16 @@ function RoomBox({ group, bookings, myUserId, onSelect }) {
   const resourceId = group.id;
   const { status, entries } = resourceStatus(bookings, resourceId, myUserId);
   const isTimed = group.kind === "room-timed";
-
-  let statusText;
-  if (isTimed) {
-    statusText =
-      entries.length === 0
-        ? "frei"
-        : `${entries.length} ${entries.length === 1 ? "Termin" : "Termine"}`;
-  } else {
-    statusText = status === "free" ? "frei" : `belegt · ${entries[0]?.name}`;
-  }
+  const dotStatus = isTimed && entries.length > 0 ? "booked" : status;
 
   return (
     <button
-      className={`room-box status-${isTimed && entries.length > 0 ? "booked" : status}`}
+      className="room-box"
       style={{ flex: group.flex }}
       onClick={() => onSelect(RESOURCES.find((r) => r.id === resourceId))}
     >
-      <div className="room-label">{group.label}</div>
-      <div className="room-status">{statusText}</div>
+      <span className={`status-dot status-dot-${dotStatus}`} />
+      <span className="room-label">{group.label}</span>
     </button>
   );
 }
@@ -75,7 +65,6 @@ export default function FloorPlan({ bookings, myUserId, onSelect }) {
             <DeskGroup
               key={g.id}
               groupId={g.id}
-              label={g.label}
               count={g.desks}
               flex={g.flex}
               bookings={bookings}
@@ -85,9 +74,7 @@ export default function FloorPlan({ bookings, myUserId, onSelect }) {
           ))}
         </div>
 
-        <div className="hallway">
-          <span>3.5</span>
-        </div>
+        <div className="hallway" />
 
         <div className="col col-right">
           <div className="stairs-row">
@@ -98,7 +85,6 @@ export default function FloorPlan({ bookings, myUserId, onSelect }) {
               <DeskGroup
                 key={g.id}
                 groupId={g.id}
-                label={g.label}
                 count={g.desks}
                 flex={g.flex}
                 bookings={bookings}

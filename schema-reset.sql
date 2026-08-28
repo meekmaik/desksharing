@@ -1,11 +1,21 @@
 -- ============================================================
--- Komplettes Schema für die Arbeitsplatz-Buchung (mit Login)
--- Einmal komplett im Supabase SQL-Editor ausführen.
+-- RESET: Löscht alle bestehenden Tabellen/Funktionen/Trigger dieser
+-- App und baut das komplette Schema (inkl. Login, 1-Platz-pro-Tag-Regel)
+-- neu auf. Einmal komplett im Supabase SQL-Editor ausführen.
 -- ============================================================
 
+-- ---------- Alles Bestehende entfernen ----------
+drop trigger if exists trg_prevent_overlap on public.bookings;
+drop trigger if exists on_auth_user_created on auth.users;
+drop function if exists public.prevent_overlapping_bookings();
+drop function if exists public.handle_new_user();
+drop table if exists public.bookings;
+drop table if exists public.profiles;
+
+-- ---------- Neu aufbauen ----------
 create extension if not exists pgcrypto;
 
--- ---------- Profile (Anzeigename + Admin-Kennzeichen) ----------
+-- Profile (Anzeigename + Admin-Kennzeichen)
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
@@ -21,7 +31,6 @@ create policy "Profile sind für alle lesbar" on public.profiles
 create policy "Nutzer darf eigenes Profil ändern" on public.profiles
   for update using (auth.uid() = id);
 
--- Automatisch ein Profil anlegen, sobald sich jemand registriert.
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
@@ -35,7 +44,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ---------- Buchungen ----------
+-- Buchungen
 create table public.bookings (
   id uuid primary key default gen_random_uuid(),
   resource_id text not null,
@@ -90,7 +99,7 @@ create trigger trg_prevent_overlap
 before insert or update on public.bookings
 for each row execute function public.prevent_overlapping_bookings();
 
--- ---------- Zugriffsregeln: nur eingeloggte Nutzer ----------
+-- Zugriffsregeln: nur eingeloggte Nutzer
 alter table public.bookings enable row level security;
 
 create policy "Eingeloggte dürfen lesen" on public.bookings
@@ -102,5 +111,5 @@ create policy "Nur für sich selbst buchen" on public.bookings
 create policy "Nur eigene Buchung stornieren" on public.bookings
   for delete using (auth.uid() = user_id);
 
--- ---------- Realtime aktivieren ----------
+-- Realtime aktivieren
 alter publication supabase_realtime add table public.bookings;

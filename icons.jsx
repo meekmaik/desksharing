@@ -13,7 +13,7 @@ export function DeskIcon({ status = "free" }) {
   const c = COLORS[status];
   const filled = status !== "free";
   return (
-    <svg width="30" height="34" viewBox="0 0 30 34" fill="none" aria-hidden="true">
+    <svg width="22" height="25" viewBox="0 0 30 34" fill="none" aria-hidden="true">
       <rect x="4" y="4" width="22" height="14" rx="1.5" fill="#fff" stroke={c} strokeWidth="2" />
       <circle
         cx="15"

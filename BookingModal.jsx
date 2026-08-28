@@ -6,6 +6,7 @@ export default function BookingModal({
   dateKey,
   horizon,
   existingBooking,
+  myExistingElsewhere,
   myUserId,
   myName,
   busy,
@@ -68,59 +69,65 @@ export default function BookingModal({
           </>
         ) : (
           <>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={seriesOn}
-                onChange={(e) => {
-                  setSeriesOn(e.target.checked);
-                  if (e.target.checked) setSelectedDates(sameWeekdayDates);
-                  else setSelectedDates([dateKey]);
-                }}
-              />
-              Serienbuchung (mehrere Tage auf einmal)
-            </label>
+            {myExistingElsewhere ? (
+              <p className="modal-hint">Du hast bereits einen Platz gebucht.</p>
+            ) : (
+              <>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={seriesOn}
+                    onChange={(e) => {
+                      setSeriesOn(e.target.checked);
+                      if (e.target.checked) setSelectedDates(sameWeekdayDates);
+                      else setSelectedDates([dateKey]);
+                    }}
+                  />
+                  Serienbuchung (mehrere Tage auf einmal)
+                </label>
 
-            {seriesOn && (
-              <div className="series-box">
-                <div className="series-quick">
-                  <button
-                    type="button"
-                    className="chip"
-                    onClick={() => setSelectedDates(sameWeekdayDates)}
-                  >
-                    Gleicher Wochentag ({horizon.find((d) => d.key === dateKey)?.weekday})
-                  </button>
-                  <button type="button" className="chip" onClick={() => setSelectedDates(allDates)}>
-                    Alle Werktage (14 Tage)
-                  </button>
-                </div>
-                <div className="series-list">
-                  {horizon.map((d) => (
-                    <label key={d.key} className="checkbox-row small">
-                      <input
-                        type="checkbox"
-                        checked={selectedDates.includes(d.key)}
-                        onChange={() => toggleDate(d.key)}
-                      />
-                      {d.weekday}, {d.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+                {seriesOn && (
+                  <div className="series-box">
+                    <div className="series-quick">
+                      <button
+                        type="button"
+                        className="chip"
+                        onClick={() => setSelectedDates(sameWeekdayDates)}
+                      >
+                        Gleicher Wochentag ({horizon.find((d) => d.key === dateKey)?.weekday})
+                      </button>
+                      <button type="button" className="chip" onClick={() => setSelectedDates(allDates)}>
+                        Alle Werktage (14 Tage)
+                      </button>
+                    </div>
+                    <div className="series-list">
+                      {horizon.map((d) => (
+                        <label key={d.key} className="checkbox-row small">
+                          <input
+                            type="checkbox"
+                            checked={selectedDates.includes(d.key)}
+                            onChange={() => toggleDate(d.key)}
+                          />
+                          {d.weekday}, {d.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  className="btn-primary"
+                  disabled={busy || selectedDates.length === 0}
+                  onClick={() => onBook(resource, selectedDates, myName)}
+                >
+                  {busy
+                    ? "Buche…"
+                    : selectedDates.length > 1
+                    ? `Für ${myName} buchen (${selectedDates.length} Tage)`
+                    : `Für ${myName} buchen`}
+                </button>
+              </>
             )}
-
-            <button
-              className="btn-primary"
-              disabled={busy || selectedDates.length === 0}
-              onClick={() => onBook(resource, selectedDates, myName)}
-            >
-              {busy
-                ? "Buche…"
-                : selectedDates.length > 1
-                ? `Für ${myName} buchen (${selectedDates.length} Tage)`
-                : `Für ${myName} buchen`}
-            </button>
           </>
         )}
 
