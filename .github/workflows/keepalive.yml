@@ -9,16 +9,16 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose
+      - name: Supabase anpingen
         run: |
-          echo "Laenge des Secrets: ${#KEY} Zeichen"
-          echo "--- Antwort der Datenbank ---"
-          curl -s -w "\nHTTP-Status: %{http_code}\n" \
-            "https://owfyrxjtbwkrqplvvuiy.supabase.co/rest/v1/" \
-            -H "apikey: $KEY"
-          echo "--- Antwort Auth-Endpunkt ---"
-          curl -s -w "\nHTTP-Status: %{http_code}\n" \
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://owfyrxjtbwkrqplvvuiy.supabase.co/auth/v1/health" \
-            -H "apikey: $KEY"
+            -H "apikey: $KEY")
+          echo "HTTP-Status: $code"
+          if [ "$code" != "200" ]; then
+            echo "Ping fehlgeschlagen"
+            exit 1
+          fi
+          echo "Supabase ist erreichbar."
         env:
           KEY: ${{ secrets.SUPABASE_ANON_KEY }}
