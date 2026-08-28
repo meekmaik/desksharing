@@ -168,14 +168,15 @@ body {
   background: repeating-linear-gradient(0deg, #e6edee, #e6edee 5px, #f2f6f6 5px, #f2f6f6 10px);
 }
 .stairs-row { display: flex; justify-content: flex-end; padding: 4px 8px; border-bottom: 1px solid var(--color-border); }
+.lounge-row { padding: 4px 6px; border-bottom: 1px solid var(--color-border); }
 .group-box {
   border-bottom: 1px solid var(--color-border);
-  padding: 5px 6px;
+  padding: 3px 6px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
-.desk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; justify-items: center; }
+.desk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0px 4px; justify-items: center; }
 .desk-btn { border: none; background: transparent; padding: 0; cursor: pointer; }
 .room-box {
   border: none;
@@ -286,10 +287,10 @@ button.small { width: auto; padding: 6px 12px; font-size: 12px; margin-bottom: 0
 .setup-notice { max-width: 480px; margin: 80px auto; padding: 24px; text-align: center; color: var(--color-text); }
 .setup-notice code { background: var(--color-turquoise-light); padding: 2px 6px; border-radius: 4px; }
 
+/* Bewusst: Grundriss behält auf allen Geräten dieselben Proportionen
+   (2 Spalten nebeneinander, gleiche Seitenverhältnisse) und wird nur
+   insgesamt kleiner/größer skaliert – kein Umstapeln auf Mobilgeräten,
+   damit die Wiedererkennbarkeit erhalten bleibt. */
 @media (max-width: 560px) {
-  .floorplan { grid-template-columns: 1fr; }
-  .col-left { border-right: none; border-bottom: 3px solid var(--color-navy-dark); }
-  .hallway { writing-mode: horizontal-tb; padding: 6px 0; }
-  .desk-grid { grid-template-columns: repeat(4, 1fr); }
   .app-header h1 { font-size: 20px; }
 }

@@ -1,5 +1,5 @@
 import { GROUPS_LEFT, GROUPS_RIGHT, RESOURCES } from "./floorplanData";
-import { DeskIcon, StairsIcon } from "./icons";
+import { DeskIcon, StairsIcon, LoungeDecor } from "./icons";
 
 function resourceStatus(bookings, resourceId, myUserId) {
   const entries = bookings[resourceId] || [];
@@ -13,12 +13,18 @@ function DeskGroup({ groupId, count, bookings, myUserId, onSelect, flex }) {
     count > 1
       ? Array.from({ length: count }, (_, i) => `${groupId}-${i + 1}`)
       : [groupId];
+  // 2 Spalten pro Reihe: obere Reihe schaut nach unten, untere Reihe schaut
+  // nach oben, damit sich die Tischpaare "gegenüber sitzen" statt alle
+  // gleich ausgerichtet zu sein.
+  const halfway = Math.ceil(ids.length / 2);
+
   return (
     <div className="group-box" style={{ flex }}>
       <div className="desk-grid">
-        {ids.map((id) => {
+        {ids.map((id, index) => {
           const { status, entries } = resourceStatus(bookings, id, myUserId);
           const resource = RESOURCES.find((r) => r.id === id);
+          const flip = index >= halfway;
           return (
             <button
               key={id}
@@ -29,7 +35,7 @@ function DeskGroup({ groupId, count, bookings, myUserId, onSelect, flex }) {
               }`}
               title={status === "free" ? "frei" : entries[0]?.name}
             >
-              <DeskIcon status={status} />
+              <DeskIcon status={status} flip={flip} />
             </button>
           );
         })}
@@ -79,6 +85,9 @@ export default function FloorPlan({ bookings, myUserId, onSelect }) {
         <div className="col col-right">
           <div className="stairs-row">
             <StairsIcon />
+          </div>
+          <div className="lounge-row">
+            <LoungeDecor />
           </div>
           {GROUPS_RIGHT.map((g) =>
             g.kind === "desk-group" ? (
