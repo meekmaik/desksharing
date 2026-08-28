@@ -197,7 +197,13 @@ body {
 .fp-room:hover .fp-desk-top { filter: brightness(0.94); }
 .fp-desk:focus-visible, .fp-room:focus-visible { outline: 2px solid var(--color-navy); }
 
-/* Besprechungstisch-Stühle */
+/* Sitzgruppe im Besprechungsraum */
+.fp-sitting { cursor: pointer; }
+.fp-hit { fill: transparent; stroke: transparent; stroke-width: 1; }
+.fp-sitting:hover .fp-hit { fill: rgba(10, 60, 97, 0.05); stroke: #c9d5da; }
+.fp-sitting:focus-visible .fp-hit { stroke: var(--color-navy); stroke-width: 2; }
+.fp-cushion { fill: #fff; stroke: #c9d5da; stroke-width: 1; }
+.fp-booked .fp-cushion, .fp-mine .fp-cushion { stroke: currentColor; }
 .fp-seat { fill: #dde5e8; }
 .fp-booked .fp-seat, .fp-mine .fp-seat { fill: currentColor; }
 .fp-booked { color: var(--color-booked); }
