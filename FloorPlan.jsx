@@ -19,10 +19,10 @@ const RIGHT_X = HALL_X + HALL_W;     // 212
 const RIGHT_W = 168;
 
 // 4 Tischgruppen links, gleichmäßig verteilt
-const GROUP_Y = [66, 250, 434, 618];
+const GROUP_Y = [56, 226, 396, 566];
 
 const DESK_W = 54;
-const DESK_H = 38;
+const DESK_H = 32;
 const CHAIR_R = 8;
 
 function statusOf(bookings, id, myUserId) {
@@ -34,14 +34,16 @@ function statusOf(bookings, id, myUserId) {
   };
 }
 
-// Ein Schreibtisch mit Stuhl. side = "left" | "right" -> Stuhl außen.
-function Desk({ id, x, y, side, bookings, myUserId, onSelect }) {
+// Ein Schreibtisch mit Stuhl. chairSide = "above" | "below".
+// Der Stuhl sitzt immer an der LANGEN Tischseite (oben oder unten).
+function Desk({ id, x, y, chairSide, bookings, myUserId, onSelect }) {
   const { status, entries } = statusOf(bookings, id, myUserId);
   const resource = RESOURCES.find((r) => r.id === id);
   if (!resource) return null;
 
-  const chairX = side === "left" ? x - CHAIR_R - 4 : x + DESK_W + CHAIR_R + 4;
-  const chairY = y + DESK_H / 2;
+  const chairX = x + DESK_W / 2;
+  const chairY =
+    chairSide === "above" ? y - CHAIR_R - 4 : y + DESK_H + CHAIR_R + 4;
   const filled = status !== "free";
   const occupied = status === "free" ? "frei" : `belegt von ${entries[0]?.name ?? "jemandem"}`;
 
@@ -78,17 +80,20 @@ function Desk({ id, x, y, side, bookings, myUserId, onSelect }) {
   );
 }
 
-// 2x2-Block: Tische stoßen in der Mitte zusammen, Stühle sitzen außen.
+// Tischgruppe von unten nach oben: Kreise, Tisch, Tisch, Kreise.
+// Die beiden Tischreihen stoßen zusammen, die Personen sitzen außen an
+// den langen Seiten und schauen sich gegenüber.
 function DeskCluster({ groupId, y, bookings, myUserId, onSelect }) {
-  const colLeftX = LEFT_X + 24;
+  const colLeftX = LEFT_X + (LEFT_W - DESK_W * 2) / 2;
   const colRightX = colLeftX + DESK_W;
-  const rowGap = 3;
+  const topRowY = y + CHAIR_R * 2 + 4;      // Platz für die obere Stuhlreihe
+  const bottomRowY = topRowY + DESK_H;      // Tische stoßen zusammen
 
   const slots = [
-    { n: 1, x: colLeftX, y, side: "left" },
-    { n: 2, x: colRightX, y, side: "right" },
-    { n: 3, x: colLeftX, y: y + DESK_H + rowGap, side: "left" },
-    { n: 4, x: colRightX, y: y + DESK_H + rowGap, side: "right" },
+    { n: 1, x: colLeftX, y: topRowY, side: "above" },
+    { n: 2, x: colRightX, y: topRowY, side: "above" },
+    { n: 3, x: colLeftX, y: bottomRowY, side: "below" },
+    { n: 4, x: colRightX, y: bottomRowY, side: "below" },
   ];
 
   return (
@@ -99,7 +104,7 @@ function DeskCluster({ groupId, y, bookings, myUserId, onSelect }) {
           id={`${groupId}-${s.n}`}
           x={s.x}
           y={s.y}
-          side={s.side}
+          chairSide={s.side}
           bookings={bookings}
           myUserId={myUserId}
           onSelect={onSelect}
@@ -116,8 +121,9 @@ function OfficeRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
   const filled = status !== "free";
   const deskW = Math.min(74, w - 46);
   const deskX = x + (w - deskW) / 2;
-  const BLOCK = 88; // Tisch + Stuhl + Namenszeile
-  const deskY = y + 18 + Math.max(6, (h - 18 - BLOCK) / 2);
+  const BLOCK = 90; // Stuhl + Tisch + Namenszeile
+  const chairY = y + 20 + Math.max(8, (h - 20 - BLOCK) / 2);
+  const deskY = chairY + CHAIR_R + 12;
 
   return (
     <g
@@ -130,6 +136,16 @@ function OfficeRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
     >
       <title>{`${group.label} – ${status === "free" ? "frei" : entries[0]?.name}`}</title>
       <rect x={x} y={y} width={w} height={h} className="fp-room-bg" />
+      <circle cx={x + w / 2} cy={chairY} r="9" className="fp-chair" />
+      {status === "mine" && (
+        <path
+          d={`M${x + w / 2 - 4.5} ${chairY} l3.4 3.4 l6 -6.6`}
+          className="fp-check"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
       <rect
         x={deskX}
         y={deskY}
@@ -139,20 +155,10 @@ function OfficeRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
         className="fp-desk-top"
         fillOpacity={filled ? 0.18 : 1}
       />
-      <circle cx={x + w / 2} cy={deskY + 40} r="9" className="fp-chair" />
-      {status === "mine" && (
-        <path
-          d={`M${x + w / 2 - 4.5} ${deskY + 40} l3.4 3.4 l6 -6.6`}
-          className="fp-check"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      )}
       <text x={x + w / 2} y={y + 16} className="fp-label">
         {group.label}
       </text>
-      <text x={x + w / 2} y={deskY + 62} className={`fp-sub ${filled ? "fp-sub-taken" : ""}`}>
+      <text x={x + w / 2} y={deskY + 44} className={`fp-sub ${filled ? "fp-sub-taken" : ""}`}>
         {status === "free" ? "frei" : entries[0]?.name}
       </text>
     </g>
@@ -261,9 +267,9 @@ function TrioArea({ group, x, y, w, h, bookings, myUserId, onSelect }) {
   const ids = [1, 2, 3].map((n) => `${group.id}-${n}`);
   const deskW = 62;
   const deskH = 24;
-  const usable = h - 30;
+  const usable = h - 42;
   const step = usable / 3;
-  const startY = y + 24 + (step - deskH) / 2;
+  const startY = y + 34 + (step - deskH - CHAIR_R) / 2;
 
   return (
     <g>
@@ -276,7 +282,7 @@ function TrioArea({ group, x, y, w, h, bookings, myUserId, onSelect }) {
         const resource = RESOURCES.find((r) => r.id === id);
         if (!resource) return null;
         const dy = startY + i * step;
-        const dx = x + 28;
+        const dx = x + (w - deskW) / 2;
         const filled = status !== "free";
         const occupied =
           status === "free" ? "frei" : `belegt von ${entries[0]?.name ?? "jemandem"}`;
@@ -291,6 +297,21 @@ function TrioArea({ group, x, y, w, h, bookings, myUserId, onSelect }) {
             aria-label={`${resource.label}: ${occupied}`}
           >
             <title>{`${resource.label} – ${occupied}`}</title>
+            <circle
+              cx={dx + deskW / 2}
+              cy={dy - CHAIR_R - 4}
+              r={CHAIR_R}
+              className="fp-chair"
+            />
+            {status === "mine" && (
+              <path
+                d={`M${dx + deskW / 2 - 4} ${dy - CHAIR_R - 4} l3 3 l5.5 -6`}
+                className="fp-check"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
             <rect
               x={dx}
               y={dy}
@@ -300,16 +321,6 @@ function TrioArea({ group, x, y, w, h, bookings, myUserId, onSelect }) {
               className="fp-desk-top"
               fillOpacity={filled ? 0.18 : 1}
             />
-            <circle cx={dx + deskW + 13} cy={dy + deskH / 2} r={CHAIR_R} className="fp-chair" />
-            {status === "mine" && (
-              <path
-                d={`M${dx + deskW + 9} ${dy + deskH / 2} l3 3 l5.5 -6`}
-                className="fp-check"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            )}
           </g>
         );
       })}
