@@ -18,8 +18,11 @@ export default function BookingModal({
   const [seriesOn, setSeriesOn] = useState(false);
   const [selectedDates, setSelectedDates] = useState([dateKey]);
 
+  // Wichtig: new Date("2026-08-28") wird als UTC gelesen und kann je nach
+  // Zeitzone auf den Vortag rutschen. Mit "T00:00:00" wird lokal geparst.
+  const weekdayOf = (key) => new Date(key + "T00:00:00").getDay();
   const sameWeekdayDates = horizon
-    .filter((d) => new Date(d.key).getDay() === new Date(dateKey).getDay())
+    .filter((d) => weekdayOf(d.key) === weekdayOf(dateKey))
     .map((d) => d.key);
   const allDates = horizon.map((d) => d.key);
 

@@ -1,7 +1,6 @@
-// Draufsicht-Symbole im Blueprint-Stil.
-// Farbe kommt ausschließlich über die "status"-Prop (nicht per Klasse),
-// damit Frei/Belegt/Eigene Buchung sich NICHT nur durch Farbe unterscheiden,
-// sondern zusätzlich durch Form/Füllung (Barrierefreiheit).
+// Draufsicht-Symbole im Grundriss-Stil.
+// Der Status wird NICHT nur über Farbe unterschieden, sondern zusätzlich
+// über Füllung und ein Häkchen (Barrierefreiheit).
 
 const COLORS = {
   free: "var(--color-free)",
@@ -9,14 +8,46 @@ const COLORS = {
   mine: "var(--color-mine)",
 };
 
-export function DeskIcon({ status = "free" }) {
+// Rechteckiger Tisch mit einem Kreis (Stuhl/Person).
+// chairPosition: "top" | "bottom" – damit sich gegenüberliegende Reihen
+// tatsächlich anschauen, statt alle gleich ausgerichtet zu sein.
+export function DeskIcon({ status = "free", chairPosition = "bottom" }) {
   const c = COLORS[status];
   const filled = status !== "free";
+  const chairTop = chairPosition === "top";
+
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="8" fill={filled ? c : "#fff"} stroke={c} strokeWidth="2" />
+    <svg width="40" height="30" viewBox="0 0 40 30" fill="none" aria-hidden="true">
+      {/* Tischplatte */}
+      <rect
+        x="2"
+        y={chairTop ? 13 : 2}
+        width="36"
+        height="15"
+        rx="1.5"
+        fill={filled ? c : "#fff"}
+        fillOpacity={filled ? 0.16 : 1}
+        stroke={c}
+        strokeWidth="1.8"
+      />
+      {/* Stuhl / Person */}
+      <circle
+        cx="20"
+        cy={chairTop ? 7 : 23}
+        r="5"
+        fill={filled ? c : "#fff"}
+        stroke={c}
+        strokeWidth="1.8"
+      />
       {status === "mine" && (
-        <path d="M6.5 10l2.3 2.3L14 7.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d={chairTop ? "M17.4 7l1.8 1.8L22.6 5.2" : "M17.4 23l1.8 1.8L22.6 21.2"}
+          stroke="#fff"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       )}
     </svg>
   );
@@ -24,7 +55,7 @@ export function DeskIcon({ status = "free" }) {
 
 export function StairsIcon() {
   return (
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+    <svg width="28" height="28" viewBox="0 0 34 34" fill="none" aria-hidden="true">
       <circle cx="17" cy="17" r="16" fill="#fff" stroke="#B7C4CC" strokeWidth="1.5" />
       <path
         d="M9 22h4v-3h4v-3h4v-3h4"
@@ -40,27 +71,75 @@ export function StairsIcon() {
   );
 }
 
-export function ClockIcon({ size = 14 }) {
+// Besprechungstisch von oben: ovaler Tisch mit Stühlen ringsum.
+export function MeetingTableIcon({ status = "free" }) {
+  const c = COLORS[status];
+  const filled = status !== "free";
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M10 6v4l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg width="86" height="46" viewBox="0 0 86 46" fill="none" aria-hidden="true">
+      {/* Stühle oben */}
+      <rect x="20" y="3" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      <rect x="38" y="3" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      <rect x="56" y="3" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      {/* Stühle unten */}
+      <rect x="20" y="36" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      <rect x="38" y="36" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      <rect x="56" y="36" width="12" height="7" rx="2" fill={filled ? c : "#E8EEF0"} />
+      {/* Tisch */}
+      <rect
+        x="14"
+        y="12"
+        width="60"
+        height="22"
+        rx="11"
+        fill={filled ? c : "#fff"}
+        fillOpacity={filled ? 0.16 : 1}
+        stroke={c}
+        strokeWidth="1.8"
+      />
     </svg>
   );
 }
 
-// Rein dekorative Lounge-Ecke – bewusst reduziert (Sofa-Silhouette + Pflanze),
-// nicht klickbar, nur zur optischen Auflockerung.
+// Einzelbüro von oben: Schreibtisch mit Stuhl.
+export function OfficeIcon({ status = "free", size = "small" }) {
+  const c = COLORS[status];
+  const filled = status !== "free";
+  const w = size === "large" ? 56 : 44;
+  return (
+    <svg width={w} height="34" viewBox={`0 0 ${w} 34`} fill="none" aria-hidden="true">
+      <rect
+        x="2"
+        y="4"
+        width={w - 4}
+        height="14"
+        rx="1.5"
+        fill={filled ? c : "#fff"}
+        fillOpacity={filled ? 0.16 : 1}
+        stroke={c}
+        strokeWidth="1.8"
+      />
+      <circle cx={w / 2} cy="26" r="5" fill={filled ? c : "#fff"} stroke={c} strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+// Rein dekorative Lounge-Ecke: Sofa mit Beistelltisch und Pflanze.
 export function LoungeDecor() {
   return (
-    <svg width="100%" height="40" viewBox="0 0 200 40" fill="none" aria-hidden="true" preserveAspectRatio="none">
-      <rect x="6" y="8" width="90" height="24" rx="10" fill="var(--color-turquoise-light)" />
-      <rect x="14" y="14" width="74" height="12" rx="6" fill="#fff" opacity="0.7" />
-      <circle cx="118" cy="20" r="9" fill="var(--color-turquoise-light)" />
+    <svg width="118" height="42" viewBox="0 0 118 42" fill="none" aria-hidden="true">
+      {/* Sofa: Rückenlehne + Sitzfläche + Armlehnen */}
+      <rect x="4" y="8" width="58" height="26" rx="4" fill="#EEF3F4" stroke="#C3D0D6" strokeWidth="1.4" />
+      <rect x="9" y="15" width="21" height="15" rx="3" fill="#fff" stroke="#C3D0D6" strokeWidth="1.2" />
+      <rect x="34" y="15" width="21" height="15" rx="3" fill="#fff" stroke="#C3D0D6" strokeWidth="1.2" />
+      {/* Beistelltisch */}
+      <circle cx="76" cy="21" r="9" fill="#fff" stroke="#C3D0D6" strokeWidth="1.4" />
+      {/* Pflanze */}
+      <circle cx="101" cy="26" r="7" fill="#EEF3F4" stroke="#C3D0D6" strokeWidth="1.3" />
       <path
-        d="M118 20c-2-6-1-10 0-12M118 20c2-5 1-9-1-11"
-        stroke="#7FA98A"
-        strokeWidth="1.6"
+        d="M101 26c-3-6-2-11 0-13M101 26c3-5 2-10 0-12M101 26c-2-7 1-11 4-13"
+        stroke="#6FA382"
+        strokeWidth="1.5"
         fill="none"
         strokeLinecap="round"
       />

@@ -3,7 +3,7 @@ import { supabase } from "./supabaseClient";
 
 const MODES = { SIGN_IN: "sign_in", SIGN_UP: "sign_up", RESET: "reset" };
 
-export default function AuthGate() {
+export default function AuthGate({ notice }) {
   const [mode, setMode] = useState(MODES.SIGN_IN);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +41,12 @@ export default function AuthGate() {
     const { error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: displayName.trim() } },
+      options: {
+        data: { display_name: displayName.trim() },
+        // Nach dem Klick auf den Bestätigungslink landet man wieder in der App
+        // (statt auf einer leeren Seite).
+        emailRedirectTo: window.location.origin + window.location.pathname,
+      },
     });
     setBusy(false);
     if (err) {
@@ -89,6 +94,7 @@ export default function AuthGate() {
         </button>
       </div>
 
+      {notice && !error && !info && <div className="modal-error">{notice}</div>}
       {error && <div className="modal-error">{error}</div>}
       {info && <div className="modal-info">{info}</div>}
 

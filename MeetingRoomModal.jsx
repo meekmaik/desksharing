@@ -16,7 +16,10 @@ export default function MeetingRoomModal({
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
 
-  const sorted = [...entries].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // Defensiv: Einträge ohne Uhrzeit würden beim Sortieren/Anzeigen abstürzen.
+  const sorted = [...entries]
+    .filter((b) => b.start_time && b.end_time)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
   const valid = start && end && end > start;
 
   return (

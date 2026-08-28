@@ -160,57 +160,77 @@ body {
 
 .loading { text-align: center; padding: 40px; color: var(--color-text-muted); }
 
-.building { border: 5px solid var(--color-navy-dark); background: #fff; padding: 3px; }
-.floorplan { display: grid; grid-template-columns: 1fr 14px 1fr; min-height: 520px; }
-.col { display: flex; flex-direction: column; }
-.col-left { border-right: 2px solid var(--color-navy-dark); }
-.hallway {
-  background: repeating-linear-gradient(0deg, #e6edee, #e6edee 5px, #f2f6f6 5px, #f2f6f6 10px);
-}
-.stairs-row { display: flex; justify-content: flex-end; padding: 4px 8px; border-bottom: 1px solid var(--color-border); }
-.lounge-row { padding: 4px 6px; border-bottom: 1px solid var(--color-border); }
-.group-box {
-  border-bottom: 1px solid var(--color-border);
-  padding: 3px 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.desk-grid {
-  display: inline-grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px 10px;
-  justify-content: center;
-}
-.group-box { align-items: center; }
-.desk-btn { border: none; background: transparent; padding: 0; cursor: pointer; }
-.room-box {
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  padding: 8px 10px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-family: inherit;
+.building {
+  max-width: 380px;
+  margin: 0 auto;
   background: #fff;
+}
+.floorplan-svg {
   width: 100%;
-  text-align: left;
+  height: auto;
+  display: block;
 }
-.room-box-row { display: flex; align-items: center; gap: 8px; }
-.room-schedule { padding-left: 17px; display: flex; flex-direction: column; gap: 2px; }
-.room-schedule-row { font-size: 11px; color: var(--color-text-muted); }
-.status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 1.5px solid;
+
+/* Wände & Flächen */
+.fp-outer-wall { fill: #fff; stroke: var(--color-navy-dark); stroke-width: 5; }
+.fp-hallway { fill: #f1f5f6; }
+.fp-room-bg { fill: #fff; }
+.fp-wall { stroke: var(--color-navy-dark); stroke-width: 4; stroke-linecap: square; }
+.fp-wall-thin { stroke: #b9c6cc; stroke-width: 1.5; }
+
+/* Tische, Stühle, Status */
+.fp-desk, .fp-room { cursor: pointer; }
+.fp-desk-top { stroke-width: 2; }
+.fp-chair { stroke-width: 2; }
+.fp-check { stroke: #fff; stroke-width: 2; }
+
+.fp-free .fp-desk-top { fill: #fff; stroke: var(--color-free); }
+.fp-free .fp-chair { fill: #fff; stroke: var(--color-free); }
+
+.fp-booked .fp-desk-top { fill: var(--color-booked); stroke: var(--color-booked); }
+.fp-booked .fp-chair { fill: var(--color-booked); stroke: var(--color-booked); }
+
+.fp-mine .fp-desk-top { fill: var(--color-mine); stroke: var(--color-mine); }
+.fp-mine .fp-chair { fill: var(--color-mine); stroke: var(--color-mine); }
+
+.fp-desk:hover .fp-desk-top,
+.fp-room:hover .fp-desk-top { filter: brightness(0.94); }
+.fp-desk:focus-visible, .fp-room:focus-visible { outline: 2px solid var(--color-navy); }
+
+/* Besprechungstisch-Stühle */
+.fp-seat { fill: #dde5e8; }
+.fp-booked .fp-seat, .fp-mine .fp-seat { fill: currentColor; }
+.fp-booked { color: var(--color-booked); }
+.fp-mine { color: var(--color-mine); }
+
+/* Dekoration (Lounge, Treppenhaus) */
+.fp-decor rect, .fp-decor circle { fill: #eef3f4; stroke: #c9d5da; stroke-width: 1; }
+.fp-decor-light { fill: #fff !important; }
+.fp-plant { stroke: #6fa382; stroke-width: 1.4; }
+.fp-stairs path { stroke: var(--color-navy); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fp-stairs-dot { fill: var(--color-navy); }
+
+/* Beschriftungen */
+.fp-label {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--color-text);
+  text-anchor: middle;
+  font-family: inherit;
 }
-.status-dot-free { background: #fff; border-color: var(--color-free); }
-.status-dot-booked { background: var(--color-booked); border-color: var(--color-booked); }
-.status-dot-mine { background: var(--color-mine); border-color: var(--color-mine); }
-.room-label { font-size: 12.5px; font-weight: 600; color: var(--color-text); }
+.fp-sub {
+  font-size: 9.5px;
+  fill: var(--color-text-muted);
+  text-anchor: middle;
+  font-family: inherit;
+}
+.fp-sub-taken { fill: var(--color-booked); font-weight: 700; }
+.fp-slot {
+  font-size: 9px;
+  fill: var(--color-text-muted);
+  text-anchor: middle;
+  font-family: inherit;
+}
 
 .overlay {
   position: fixed;
@@ -303,3 +323,33 @@ button.small { width: auto; padding: 6px 12px; font-size: 12px; margin-bottom: 0
 @media (max-width: 560px) {
   .app-header h1 { font-size: 20px; }
 }
+
+/* ---------- "Wer ist da?"-Panel ---------- */
+.search-input {
+  width: 100%;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  margin-bottom: 12px;
+  font-family: inherit;
+}
+.who-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.who-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.who-name { font-weight: 700; }
+.who-place { color: var(--color-text-muted); font-size: 12px; text-align: right; }
+.who-time { color: var(--color-booked); font-weight: 600; }

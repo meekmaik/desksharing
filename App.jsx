@@ -11,6 +11,7 @@ import ResetPasswordForm from "./ResetPasswordForm";
 import BookingModal from "./BookingModal";
 import MeetingRoomModal from "./MeetingRoomModal";
 import MyBookingsPanel from "./MyBookingsPanel";
+import WhoIsInPanel from "./WhoIsInPanel";
 
 const FULLDAY_RESOURCE_COUNT = RESOURCES.filter((r) => !r.timeBased).length;
 
@@ -20,6 +21,7 @@ export default function App() {
   const [displayName, setDisplayName] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [authNotice, setAuthNotice] = useState(null);
 
   const [selectedDateKey, setSelectedDateKey] = useState(horizon[0].key);
   const [allBookings, setAllBookings] = useState([]);
@@ -40,13 +42,38 @@ export default function App() {
       setAuthLoading(false);
       return;
     }
+
+    // Kommt man über einen E-Mail-Link (Bestätigung / Passwort-Reset) zurück,
+    // hängen Tokens oder ein Fehler im URL-Fragment. Das wird ausgewertet und
+    // die Adresse anschließend aufgeräumt, damit niemand auf einer leeren
+    // Seite mit kryptischer URL landet.
+    const hash = window.location.hash || "";
+    const hadAuthHash = hash.includes("access_token") || hash.includes("error");
+    if (hash.includes("error")) {
+      const params = new URLSearchParams(hash.replace(/^#/, ""));
+      const desc = params.get("error_description");
+      setAuthNotice(
+        desc?.toLowerCase().includes("expired")
+          ? "Der Link ist abgelaufen. Bitte fordere einen neuen an."
+          : "Der Link konnte nicht verarbeitet werden. Bitte versuche es erneut."
+      );
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setAuthLoading(false);
+      if (hadAuthHash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
     });
+
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
+      }
+      if (event === "SIGNED_IN" && hadAuthHash) {
+        setAuthNotice(null);
+        showToast("E-Mail bestätigt – willkommen!");
       }
       setSession(newSession);
     });
@@ -171,11 +198,12 @@ export default function App() {
   const handleCancelFullDay = async (booking, mode) => {
     setBusy(true);
     setError(null);
+    // Absicherung: ohne series_id würde .eq("series_id", null) ins Leere laufen.
+    const useSeries = mode === "series" && !!booking.series_id;
     const query = supabase.from("bookings").delete();
-    const { error: err } =
-      mode === "series"
-        ? await query.eq("series_id", booking.series_id)
-        : await query.eq("id", booking.id);
+    const { error: err } = useSeries
+      ? await query.eq("series_id", booking.series_id)
+      : await query.eq("id", booking.id);
     setBusy(false);
     if (err) {
       setError("Stornieren fehlgeschlagen. Bitte erneut versuchen.");
@@ -183,7 +211,7 @@ export default function App() {
     }
     await loadBookings();
     closeModal();
-    showToast("Storniert.");
+    showToast(useSeries ? "Serie storniert." : "Storniert.");
   };
 
   const handleBookTimed = async (resource, dateKey, start, end, name) => {
@@ -256,6 +284,9 @@ export default function App() {
           {session && (
             <>
               <span className="hello">Hallo, {displayName}</span>
+              <button className="btn-secondary" onClick={() => setModal({ type: "who-is-in" })}>
+                Wer ist da?
+              </button>
               <button className="btn-secondary" onClick={() => setModal({ type: "my-bookings" })}>
                 Meine Buchungen
               </button>
@@ -268,7 +299,7 @@ export default function App() {
       </header>
 
       {!session ? (
-        <AuthGate />
+        <AuthGate notice={authNotice} />
       ) : (
         <>
           <DatePicker horizon={horizon} selectedKey={selectedDateKey} onSelect={setSelectedDateKey} />
@@ -323,6 +354,14 @@ export default function App() {
           onClose={closeModal}
           onBook={handleBookTimed}
           onCancel={handleCancelTimed}
+        />
+      )}
+
+      {modal?.type === "who-is-in" && (
+        <WhoIsInPanel
+          bookingsForDate={bookingsForSelectedDate}
+          dateKey={selectedDateKey}
+          onClose={closeModal}
         />
       )}
 

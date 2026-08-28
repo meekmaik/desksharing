@@ -106,10 +106,59 @@ create policy "Eingeloggte dürfen lesen" on public.bookings
   for select using (auth.role() = 'authenticated');
 
 create policy "Nur für sich selbst buchen" on public.bookings
-  for insert with check (auth.uid() = user_id);
+  for insert with check (
+    auth.uid() = user_id
+    and date >= current_date
+    and date <= current_date + interval '30 days'
+  );
 
 create policy "Nur eigene Buchung stornieren" on public.bookings
   for delete using (auth.uid() = user_id);
+
+-- ---------- Sicherheit: Rechteausweitung verhindern ----------
+-- Ohne das könnte sich jede Person selbst zum Admin machen.
+create or replace function public.protect_admin_flag()
+returns trigger as $$
+declare
+  caller_is_admin boolean;
+begin
+  select p.is_admin into caller_is_admin
+  from public.profiles p
+  where p.id = auth.uid();
+
+  if new.is_admin is distinct from old.is_admin
+     and coalesce(caller_is_admin, false) = false then
+    new.is_admin := old.is_admin;
+  end if;
+
+  new.id := old.id;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger trg_protect_admin_flag
+before update on public.profiles
+for each row execute function public.protect_admin_flag();
+
+-- ---------- Sicherheit: Buchungsnamen serverseitig setzen ----------
+-- Ohne das könnte man über die API unter fremdem Namen buchen.
+create or replace function public.set_booking_name()
+returns trigger as $$
+begin
+  select coalesce(p.display_name, 'Unbekannt') into new.name
+  from public.profiles p
+  where p.id = new.user_id;
+
+  if new.name is null then
+    new.name := 'Unbekannt';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create trigger trg_set_booking_name
+before insert or update on public.bookings
+for each row execute function public.set_booking_name();
 
 -- Realtime aktivieren
 alter publication supabase_realtime add table public.bookings;
