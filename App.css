@@ -10,8 +10,8 @@
   --color-text-muted: #647680;
 
   --color-free: #12a5a0;
-  --color-booked: #d9772b;
-  --color-mine: #0a3c61;
+  --color-booked: #e30613;
+  --color-mine: #4169e1;
 }
 
 * { box-sizing: border-box; }
@@ -176,7 +176,13 @@ body {
   flex-direction: column;
   justify-content: center;
 }
-.desk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0px 4px; justify-items: center; }
+.desk-grid {
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 10px;
+  justify-content: center;
+}
+.group-box { align-items: center; }
 .desk-btn { border: none; background: transparent; padding: 0; cursor: pointer; }
 .room-box {
   border: none;
@@ -184,13 +190,16 @@ body {
   padding: 8px 10px;
   cursor: pointer;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   font-family: inherit;
   background: #fff;
   width: 100%;
   text-align: left;
 }
+.room-box-row { display: flex; align-items: center; gap: 8px; }
+.room-schedule { padding-left: 17px; display: flex; flex-direction: column; gap: 2px; }
+.room-schedule-row { font-size: 11px; color: var(--color-text-muted); }
 .status-dot {
   width: 9px;
   height: 9px;

@@ -9,30 +9,14 @@ const COLORS = {
   mine: "var(--color-mine)",
 };
 
-export function DeskIcon({ status = "free", flip = false }) {
+export function DeskIcon({ status = "free" }) {
   const c = COLORS[status];
   const filled = status !== "free";
   return (
-    <svg
-      width="22"
-      height="25"
-      viewBox="0 0 30 34"
-      fill="none"
-      aria-hidden="true"
-      style={flip ? { transform: "scaleY(-1)" } : undefined}
-    >
-      <rect x="4" y="4" width="22" height="14" rx="1.5" fill="#fff" stroke={c} strokeWidth="2" />
-      <circle
-        cx="15"
-        cy="27"
-        r="5.5"
-        fill={filled ? c : "none"}
-        fillOpacity={filled ? 0.22 : 1}
-        stroke={c}
-        strokeWidth="1.6"
-      />
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <circle cx="10" cy="10" r="8" fill={filled ? c : "#fff"} stroke={c} strokeWidth="2" />
       {status === "mine" && (
-        <path d="M12 27l2 2 4-4.5" stroke={c} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6.5 10l2.3 2.3L14 7.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       )}
     </svg>
   );
@@ -65,33 +49,21 @@ export function ClockIcon({ size = 14 }) {
   );
 }
 
-// Rein dekorative Lounge-Ecke (Sofa, Pflanze, Beistelltisch) – nicht klickbar,
-// nur zur optischen Annäherung an den Original-Grundriss.
+// Rein dekorative Lounge-Ecke – bewusst reduziert (Sofa-Silhouette + Pflanze),
+// nicht klickbar, nur zur optischen Auflockerung.
 export function LoungeDecor() {
   return (
-    <svg width="100%" height="46" viewBox="0 0 200 46" fill="none" aria-hidden="true" preserveAspectRatio="none">
-      {/* Sofa */}
-      <rect x="8" y="10" width="70" height="26" rx="4" fill="#fff" stroke="#B7C4CC" strokeWidth="1.5" />
-      <rect x="8" y="10" width="70" height="9" rx="3" fill="#EEF2F0" stroke="#B7C4CC" strokeWidth="1.2" />
-      <line x1="32" y1="10" x2="32" y2="36" stroke="#B7C4CC" strokeWidth="1" />
-      <line x1="55" y1="10" x2="55" y2="36" stroke="#B7C4CC" strokeWidth="1" />
-      {/* Beistelltisch */}
-      <circle cx="96" cy="23" r="10" fill="#fff" stroke="#B7C4CC" strokeWidth="1.5" />
-      {/* Pflanze */}
-      <circle cx="128" cy="27" r="7" fill="#EEF2F0" stroke="#B7C4CC" strokeWidth="1.4" />
+    <svg width="100%" height="40" viewBox="0 0 200 40" fill="none" aria-hidden="true" preserveAspectRatio="none">
+      <rect x="6" y="8" width="90" height="24" rx="10" fill="var(--color-turquoise-light)" />
+      <rect x="14" y="14" width="74" height="12" rx="6" fill="#fff" opacity="0.7" />
+      <circle cx="118" cy="20" r="9" fill="var(--color-turquoise-light)" />
       <path
-        d="M128 27c-3-8-2-14 0-17M128 27c3-7 1-13-1-16M128 27c-1-9 2-15 5-17"
+        d="M118 20c-2-6-1-10 0-12M118 20c2-5 1-9-1-11"
         stroke="#7FA98A"
-        strokeWidth="1.4"
+        strokeWidth="1.6"
         fill="none"
         strokeLinecap="round"
       />
-      {/* Kleiner Wagen */}
-      <rect x="150" y="12" width="16" height="20" rx="1.5" fill="#fff" stroke="#B7C4CC" strokeWidth="1.4" />
-      <line x1="150" y1="19" x2="166" y2="19" stroke="#B7C4CC" strokeWidth="1" />
-      <line x1="150" y1="26" x2="166" y2="26" stroke="#B7C4CC" strokeWidth="1" />
-      <circle cx="153" cy="34" r="1.6" fill="#B7C4CC" />
-      <circle cx="163" cy="34" r="1.6" fill="#B7C4CC" />
     </svg>
   );
 }

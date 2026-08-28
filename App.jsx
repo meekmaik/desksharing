@@ -250,7 +250,6 @@ export default function App() {
     <div className="page">
       <header className="app-header">
         <div>
-          <div className="eyebrow">Raum 3.5</div>
           <h1>Arbeitsplatz-Buchung</h1>
         </div>
         <div className="header-actions">

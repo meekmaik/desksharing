@@ -13,18 +13,13 @@ function DeskGroup({ groupId, count, bookings, myUserId, onSelect, flex }) {
     count > 1
       ? Array.from({ length: count }, (_, i) => `${groupId}-${i + 1}`)
       : [groupId];
-  // 2 Spalten pro Reihe: obere Reihe schaut nach unten, untere Reihe schaut
-  // nach oben, damit sich die Tischpaare "gegenüber sitzen" statt alle
-  // gleich ausgerichtet zu sein.
-  const halfway = Math.ceil(ids.length / 2);
 
   return (
     <div className="group-box" style={{ flex }}>
       <div className="desk-grid">
-        {ids.map((id, index) => {
+        {ids.map((id) => {
           const { status, entries } = resourceStatus(bookings, id, myUserId);
           const resource = RESOURCES.find((r) => r.id === id);
-          const flip = index >= halfway;
           return (
             <button
               key={id}
@@ -35,7 +30,7 @@ function DeskGroup({ groupId, count, bookings, myUserId, onSelect, flex }) {
               }`}
               title={status === "free" ? "frei" : entries[0]?.name}
             >
-              <DeskIcon status={status} flip={flip} />
+              <DeskIcon status={status} />
             </button>
           );
         })}
@@ -50,14 +45,29 @@ function RoomBox({ group, bookings, myUserId, onSelect }) {
   const isTimed = group.kind === "room-timed";
   const dotStatus = isTimed && entries.length > 0 ? "booked" : status;
 
+  const sortedEntries = isTimed
+    ? [...entries].sort((a, b) => a.start_time.localeCompare(b.start_time))
+    : [];
+
   return (
     <button
       className="room-box"
       style={{ flex: group.flex }}
       onClick={() => onSelect(RESOURCES.find((r) => r.id === resourceId))}
     >
-      <span className={`status-dot status-dot-${dotStatus}`} />
-      <span className="room-label">{group.label}</span>
+      <div className="room-box-row">
+        <span className={`status-dot status-dot-${dotStatus}`} />
+        <span className="room-label">{group.label}</span>
+      </div>
+      {isTimed && sortedEntries.length > 0 && (
+        <div className="room-schedule">
+          {sortedEntries.map((b) => (
+            <div key={b.id} className="room-schedule-row">
+              {b.start_time.slice(0, 5)}–{b.end_time.slice(0, 5)} · {b.name}
+            </div>
+          ))}
+        </div>
+      )}
     </button>
   );
 }
