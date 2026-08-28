@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatDateLong } from "./dateUtils";
+import { minutesOf, formatDuration, endAfterStartChange } from "./timeUtils";
 
 export default function MeetingRoomModal({
   resource,
@@ -15,6 +16,14 @@ export default function MeetingRoomModal({
 }) {
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
+
+  // Beim Verschieben der Startzeit wandert die Endzeit mit und behält die
+  // eingestellte Dauer (Standard: 1 Stunde). Ohne das konnte die Endzeit vor
+  // der Startzeit landen.
+  const handleStartChange = (value) => {
+    setStart(value);
+    if (value) setEnd(endAfterStartChange(start, end, value));
+  };
 
   // Defensiv: Einträge ohne Uhrzeit würden beim Sortieren/Anzeigen abstürzen.
   const sorted = [...entries]
@@ -56,14 +65,23 @@ export default function MeetingRoomModal({
           <div className="time-fields">
             <label>
               Von
-              <input type="time" value={start} onChange={(e) => setStart(e.target.value)} step="900" />
+              <input
+                type="time"
+                value={start}
+                onChange={(e) => handleStartChange(e.target.value)}
+                step="900"
+              />
             </label>
             <label>
               Bis
               <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} step="900" />
             </label>
           </div>
-          {!valid && <p className="modal-hint">Die Endzeit muss nach der Startzeit liegen.</p>}
+          {valid ? (
+            <p className="modal-hint">Dauer: {formatDuration(minutesOf(end) - minutesOf(start))}</p>
+          ) : (
+            <p className="modal-hint">Die Endzeit muss nach der Startzeit liegen.</p>
+          )}
           <button
             className="btn-primary"
             disabled={busy || !valid}

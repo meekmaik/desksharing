@@ -359,3 +359,11 @@ button.small { width: auto; padding: 6px 12px; font-size: 12px; margin-bottom: 0
 .who-name { font-weight: 700; }
 .who-place { color: var(--color-text-muted); font-size: 12px; text-align: right; }
 .who-time { color: var(--color-booked); font-weight: 600; }
+
+.checkbox-row.is-blocked { color: #9aabb2; }
+.blocked-note {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--color-booked);
+  white-space: nowrap;
+}

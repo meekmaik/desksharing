@@ -16,7 +16,26 @@ import WhoIsInPanel from "./WhoIsInPanel";
 const FULLDAY_RESOURCE_COUNT = RESOURCES.filter((r) => !r.timeBased).length;
 
 export default function App() {
-  const horizon = useMemo(() => getBookingHorizon(14), []);
+  const [horizon, setHorizon] = useState(() => getBookingHorizon(14));
+
+  // Bleibt der Tab über Mitternacht offen, wäre der erste Tag sonst gestern.
+  // Beim Zurückkehren zum Tab und minütlich prüfen, ob sich der Tag geändert hat.
+  useEffect(() => {
+    const refresh = () => {
+      setHorizon((prev) => {
+        const next = getBookingHorizon(14);
+        return next[0].key === prev[0].key ? prev : next;
+      });
+    };
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
   const [session, setSession] = useState(null);
   const [displayName, setDisplayName] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
@@ -24,6 +43,14 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState(null);
 
   const [selectedDateKey, setSelectedDateKey] = useState(horizon[0].key);
+
+  // Ist der gewählte Tag aus dem Horizont gefallen (Tageswechsel), auf den
+  // ersten gültigen Tag zurückspringen.
+  useEffect(() => {
+    if (!horizon.some((d) => d.key === selectedDateKey)) {
+      setSelectedDateKey(horizon[0].key);
+    }
+  }, [horizon, selectedDateKey]);
   const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
@@ -91,7 +118,9 @@ export default function App() {
       .select("display_name")
       .eq("id", session.user.id)
       .single()
-      .then(({ data }) => setDisplayName(data?.display_name || session.user.email));
+      .then(({ data }) =>
+        setDisplayName(data?.display_name || session.user.email?.split("@")[0] || "Ich")
+      );
   }, [session]);
 
   const myUserId = session?.user?.id || null;
@@ -152,6 +181,18 @@ export default function App() {
     );
   }, [allBookings, myUserId, selectedDateKey]);
 
+  // Alle Tage, an denen ich bereits irgendwo einen Platz habe. Diese Tage
+  // können in einer Serie nicht zusätzlich gebucht werden (1 Platz pro Tag).
+  const myBookedDates = useMemo(
+    () =>
+      new Set(
+        allBookings
+          .filter((b) => b.user_id === myUserId && b.start_time === null)
+          .map((b) => b.date)
+      ),
+    [allBookings, myUserId]
+  );
+
   const openResource = (resource) => {
     setError(null);
     if (resource.timeBased) {
@@ -162,25 +203,41 @@ export default function App() {
     }
   };
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModal(null);
     setError(null);
-  };
+  }, []);
+
+  // Escape schließt den offenen Dialog – erwartetes Verhalten in jeder App.
+  useEffect(() => {
+    if (!modal) return;
+    const onKey = (e) => e.key === "Escape" && closeModal();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modal, closeModal]);
 
   const handleBookFullDay = async (resource, dates, name) => {
     setBusy(true);
     setError(null);
     const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
-    const failed = [];
-    for (const date of dates) {
-      const { error: err } = await supabase.from("bookings").insert({
-        resource_id: resource.id,
-        date,
-        name,
-        user_id: myUserId,
-        series_id: seriesId,
-      });
-      if (err) failed.push(date);
+    const row = (date) => ({
+      resource_id: resource.id,
+      date,
+      name,
+      user_id: myUserId,
+      series_id: seriesId,
+    });
+
+    let failed = [];
+    const { error: bulkErr } = await supabase.from("bookings").insert(dates.map(row));
+    if (bulkErr) {
+      // Mindestens ein Tag ist belegt – einzeln nachfassen, um die restlichen
+      // Tage trotzdem zu buchen und genau zu wissen, welche fehlschlagen.
+      failed = [];
+      for (const date of dates) {
+        const { error: err } = await supabase.from("bookings").insert(row(date));
+        if (err) failed.push(date);
+      }
     }
     setBusy(false);
     await loadBookings();
@@ -195,7 +252,7 @@ export default function App() {
     }
   };
 
-  const handleCancelFullDay = async (booking, mode) => {
+  const handleCancelFullDay = async (booking, mode, keepOpen = false) => {
     setBusy(true);
     setError(null);
     // Absicherung: ohne series_id würde .eq("series_id", null) ins Leere laufen.
@@ -210,7 +267,7 @@ export default function App() {
       return;
     }
     await loadBookings();
-    closeModal();
+    if (!keepOpen) closeModal();
     showToast(useSeries ? "Serie storniert." : "Storniert.");
   };
 
@@ -332,6 +389,7 @@ export default function App() {
               ? myFullDayBookingToday
               : null
           }
+          myBookedDates={myBookedDates}
           myUserId={myUserId}
           myName={displayName}
           busy={busy}
@@ -370,7 +428,7 @@ export default function App() {
           allBookings={allBookings}
           myUserId={myUserId}
           busy={busy}
-          onCancel={handleCancelFullDay}
+          onCancel={(b, mode) => handleCancelFullDay(b, mode, true)}
           onClose={closeModal}
         />
       )}

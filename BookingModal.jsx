@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatDateLong } from "./dateUtils";
+import { computeSeriesOptions } from "./seriesUtils";
 
 export default function BookingModal({
   resource,
@@ -7,6 +8,7 @@ export default function BookingModal({
   horizon,
   existingBooking,
   myExistingElsewhere,
+  myBookedDates,
   myUserId,
   myName,
   busy,
@@ -18,15 +20,14 @@ export default function BookingModal({
   const [seriesOn, setSeriesOn] = useState(false);
   const [selectedDates, setSelectedDates] = useState([dateKey]);
 
-  // Wichtig: new Date("2026-08-28") wird als UTC gelesen und kann je nach
-  // Zeitzone auf den Vortag rutschen. Mit "T00:00:00" wird lokal geparst.
-  const weekdayOf = (key) => new Date(key + "T00:00:00").getDay();
-  const sameWeekdayDates = horizon
-    .filter((d) => weekdayOf(d.key) === weekdayOf(dateKey))
-    .map((d) => d.key);
-  const allDates = horizon.map((d) => d.key);
+  const { isBlocked: blocked, sameWeekdayDates, allDates } = computeSeriesOptions(
+    horizon,
+    dateKey,
+    myBookedDates
+  );
 
   const toggleDate = (key) => {
+    if (blocked(key)) return;
     setSelectedDates((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
@@ -100,20 +101,28 @@ export default function BookingModal({
                         Gleicher Wochentag ({horizon.find((d) => d.key === dateKey)?.weekday})
                       </button>
                       <button type="button" className="chip" onClick={() => setSelectedDates(allDates)}>
-                        Alle Werktage (14 Tage)
+                        Alle freien Werktage ({allDates.length})
                       </button>
                     </div>
                     <div className="series-list">
-                      {horizon.map((d) => (
-                        <label key={d.key} className="checkbox-row small">
-                          <input
-                            type="checkbox"
-                            checked={selectedDates.includes(d.key)}
-                            onChange={() => toggleDate(d.key)}
-                          />
-                          {d.weekday}, {d.label}
-                        </label>
-                      ))}
+                      {horizon.map((d) => {
+                        const isBlocked = blocked(d.key);
+                        return (
+                          <label
+                            key={d.key}
+                            className={`checkbox-row small ${isBlocked ? "is-blocked" : ""}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedDates.includes(d.key)}
+                              disabled={isBlocked}
+                              onChange={() => toggleDate(d.key)}
+                            />
+                            {d.weekday}, {d.label}
+                            {isBlocked && <span className="blocked-note">schon gebucht</span>}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
