@@ -23,7 +23,16 @@ export default function AuthGate({ notice }) {
     setBusy(true);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (err) setError("E-Mail oder Passwort ist falsch.");
+    if (err) {
+      const msg = err.message?.toLowerCase() || "";
+      if (msg.includes("not confirmed")) {
+        setError("Bitte bestätige zuerst deine E-Mail-Adresse – der Link liegt in deinem Postfach.");
+      } else if (msg.includes("rate limit") || msg.includes("security purposes")) {
+        setError("Zu viele Versuche. Bitte warte kurz und versuche es dann erneut.");
+      } else {
+        setError("E-Mail oder Passwort ist falsch.");
+      }
+    }
   };
 
   const handleSignUp = async (e) => {
@@ -137,6 +146,7 @@ export default function AuthGate({ notice }) {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Vor- und Nachname"
+              maxLength={60}
               required
             />
           </label>
