@@ -59,14 +59,23 @@ export default function AuthGate({ notice }) {
     });
     setBusy(false);
     if (err) {
-      setError(
-        err.message?.includes("already registered")
-          ? "Für diese E-Mail existiert bereits ein Konto. Bitte einloggen."
-          : "Registrierung fehlgeschlagen. Bitte prüfe deine Angaben."
-      );
+      const msg = err.message?.toLowerCase() || "";
+      if (msg.includes("already registered") || msg.includes("already been registered")) {
+        setError("Für diese E-Mail existiert bereits ein Konto. Bitte einloggen.");
+      } else if (msg.includes("rate limit") || msg.includes("security purposes")) {
+        setError("Zu viele Registrierungsversuche kurz hintereinander. Bitte kurz warten und erneut versuchen.");
+      } else if (msg.includes("password")) {
+        setError(`Passwort nicht akzeptiert: ${err.message}`);
+      } else if (msg.includes("invalid") && msg.includes("email")) {
+        setError("Diese E-Mail-Adresse wird von Supabase nicht akzeptiert. Bitte prüfen.");
+      } else {
+        // Rohtext mit anzeigen statt eines reinen Auffangsatzes – sonst lässt
+        // sich die eigentliche Ursache im Fehlerfall nicht mehr erkennen.
+        setError(`Registrierung fehlgeschlagen: ${err.message || "unbekannter Fehler"}`);
+      }
       return;
     }
-    setInfo("Konto erstellt! Falls eine Bestätigungs-Mail nötig ist, schau in dein Postfach.");
+    setInfo("Konto erstellt! Du kannst dich jetzt direkt einloggen.");
   };
 
   const handleReset = async (e) => {
