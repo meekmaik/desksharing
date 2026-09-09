@@ -179,10 +179,17 @@ function MeetingRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
   const booked = entries.length > 0;
   const cls = booked ? (status === "mine" ? "mine" : "booked") : "free";
 
-  const list = [...entries]
+  const allList = [...entries]
     .filter((b) => b.start_time && b.end_time)
-    .sort((a, b) => a.start_time.localeCompare(b.start_time))
-    .slice(0, 3);
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // Bei mehr als 3 Terminen bleiben nur 2 sichtbar, der Rest wird als
+  // "+N weitere" zusammengefasst (klickbar, öffnet die vollständige
+  // Liste) -- damit bleibt die Fläche unabhängig von der Anzahl an
+  // Buchungen an einem Tag immer gleich groß, ohne Termine kommentarlos
+  // verschwinden zu lassen.
+  const visibleCount = allList.length > 3 ? 2 : allList.length;
+  const visibleList = allList.slice(0, visibleCount);
+  const hiddenCount = allList.length - visibleCount;
 
   const cx = x + w / 2;
   const couchW = 96;
@@ -274,17 +281,36 @@ function MeetingRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
         )}
       </g>
 
-      {/* Termine des Tages */}
-      {list.length === 0 ? (
+      {/* Termine des Tages -- klickbar, oeffnet dieselbe Detailansicht
+          wie die Sitzgruppe oben */}
+      {allList.length === 0 ? (
         <text x={cx} y={tableY + tableH + 24} className="fp-sub">
           frei – ganztägig
         </text>
       ) : (
-        list.map((b, i) => (
-          <text key={b.id} x={cx} y={tableY + tableH + 22 + i * 13} className="fp-slot">
-            {b.start_time.slice(0, 5)}–{b.end_time.slice(0, 5)} {b.name}
-          </text>
-        ))
+        <g
+          className="fp-schedule"
+          onClick={() => resource && onSelect(resource)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && resource && onSelect(resource)}
+          aria-label={`${group.label}: ${label}, Termine anzeigen`}
+        >
+          {visibleList.map((b, i) => (
+            <text key={b.id} x={cx} y={tableY + tableH + 22 + i * 13} className="fp-slot">
+              {b.start_time.slice(0, 5)}–{b.end_time.slice(0, 5)} {b.name}
+            </text>
+          ))}
+          {hiddenCount > 0 && (
+            <text
+              x={cx}
+              y={tableY + tableH + 22 + visibleList.length * 13}
+              className="fp-slot fp-slot-more"
+            >
+              +{hiddenCount} weitere
+            </text>
+          )}
+        </g>
       )}
     </g>
   );

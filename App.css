@@ -237,6 +237,8 @@ body {
   text-anchor: middle;
   font-family: inherit;
 }
+.fp-schedule { cursor: pointer; }
+.fp-slot-more { fill: var(--color-navy); font-weight: 700; text-decoration: underline; }
 
 .overlay {
   position: fixed;
