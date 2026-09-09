@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import "./App.css";
 import { supabase, isConfigured } from "./supabaseClient";
 import { RESOURCES } from "./floorplanData";
@@ -12,8 +12,20 @@ import BookingModal from "./BookingModal";
 import MeetingRoomModal from "./MeetingRoomModal";
 import MyBookingsPanel from "./MyBookingsPanel";
 import WhoIsInPanel from "./WhoIsInPanel";
+import AdminPanel from "./AdminPanel";
 
 const FULLDAY_RESOURCE_COUNT = RESOURCES.filter((r) => !r.timeBased).length;
+
+// crypto.randomUUID fehlt in älteren Browsern (z. B. iOS < 15.4).
+function makeUuid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 export default function App() {
   const [horizon, setHorizon] = useState(() => getBookingHorizon(14));
@@ -38,6 +50,7 @@ export default function App() {
   }, []);
   const [session, setSession] = useState(null);
   const [displayName, setDisplayName] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [authNotice, setAuthNotice] = useState(null);
@@ -58,9 +71,13 @@ export default function App() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const toastTimer = useRef(null);
   const showToast = (msg) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    // Vorherigen Timer stoppen, sonst verschwindet ein neuer Toast zu früh,
+    // wenn kurz zuvor schon einer angezeigt wurde.
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
   };
 
   // ---- Login-Status verwalten ----
@@ -98,6 +115,11 @@ export default function App() {
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
       }
+      if (!newSession) {
+        // Nach Logout (auch in einem anderen Tab) keine offenen Dialoge
+        // mit toten Buchungs-Buttons stehen lassen.
+        setModal(null);
+      }
       if (event === "SIGNED_IN" && hadAuthHash) {
         setAuthNotice(null);
         showToast("E-Mail bestätigt – willkommen!");
@@ -107,20 +129,26 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // ---- Anzeigenamen aus dem Profil laden ----
+  // ---- Anzeigenamen + Admin-Status aus dem Profil laden ----
+  // Wichtig: is_admin steuert hier NUR, ob der Admin-Button sichtbar ist.
+  // Die eigentliche Absicherung liegt in den Datenbank-Regeln (RLS) --
+  // selbst wenn jemand den Button per Entwicklertools sichtbar machen
+  // würde, käme er ohne echte Admin-Rechte in der Datenbank nicht weiter.
   useEffect(() => {
     if (!supabase || !session) {
       setDisplayName("");
+      setIsAdmin(false);
       return;
     }
     supabase
       .from("profiles")
-      .select("display_name")
+      .select("display_name, is_admin")
       .eq("id", session.user.id)
       .single()
-      .then(({ data }) =>
-        setDisplayName(data?.display_name || session.user.email?.split("@")[0] || "Ich")
-      );
+      .then(({ data }) => {
+        setDisplayName(data?.display_name || session.user.email?.split("@")[0] || "Ich");
+        setIsAdmin(!!data?.is_admin);
+      });
   }, [session]);
 
   const myUserId = session?.user?.id || null;
@@ -148,6 +176,8 @@ export default function App() {
   useEffect(() => {
     loadBookings();
     if (!supabase || !session) return;
+    const onFocus = () => loadBookings();
+    window.addEventListener("focus", onFocus);
     const channel = supabase
       .channel("bookings-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => {
@@ -155,6 +185,7 @@ export default function App() {
       })
       .subscribe();
     return () => {
+      window.removeEventListener("focus", onFocus);
       supabase.removeChannel(channel);
     };
   }, [loadBookings, session]);
@@ -219,7 +250,7 @@ export default function App() {
   const handleBookFullDay = async (resource, dates, name) => {
     setBusy(true);
     setError(null);
-    const seriesId = dates.length > 1 ? crypto.randomUUID() : null;
+    const seriesId = dates.length > 1 ? makeUuid() : null;
     const row = (date) => ({
       resource_id: resource.id,
       date,
@@ -293,6 +324,7 @@ export default function App() {
 
   const handleCancelTimed = async (booking) => {
     setBusy(true);
+    setError(null);
     const { error: err } = await supabase.from("bookings").delete().eq("id", booking.id);
     setBusy(false);
     if (err) {
@@ -326,7 +358,7 @@ export default function App() {
   if (passwordRecovery) {
     return (
       <div className="page">
-        <ResetPasswordForm />
+        <ResetPasswordForm onDone={() => setPasswordRecovery(false)} />
       </div>
     );
   }
@@ -347,6 +379,11 @@ export default function App() {
               <button className="btn-secondary" onClick={() => setModal({ type: "my-bookings" })}>
                 Meine Buchungen
               </button>
+              {isAdmin && (
+                <button className="btn-secondary" onClick={() => setModal({ type: "admin" })}>
+                  Admin-Bereich
+                </button>
+              )}
               <button className="btn-secondary" onClick={handleLogout}>
                 Logout
               </button>
@@ -431,6 +468,10 @@ export default function App() {
           onCancel={(b, mode) => handleCancelFullDay(b, mode, true)}
           onClose={closeModal}
         />
+      )}
+
+      {modal?.type === "admin" && isAdmin && (
+        <AdminPanel myUserId={myUserId} onClose={closeModal} />
       )}
 
       {toast && <div className="toast">{toast}</div>}
