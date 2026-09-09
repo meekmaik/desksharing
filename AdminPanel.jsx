@@ -169,16 +169,13 @@ export default function AdminPanel({ myUserId, onClose }) {
                         {u.id === myUserId && <span className="admin-you"> (du)</span>}
                       </span>
                       {u.is_admin && <span className="admin-badge">Admin</span>}
+                      {u.is_admin && u.id === myUserId && (
+                        <span className="admin-row-note">Du verlierst danach deinen eigenen Zugriff.</span>
+                      )}
                     </div>
                     <ConfirmButton
-                      label={u.is_admin ? "Admin entfernen" : "Zum Admin machen"}
-                      confirmLabel={
-                        u.is_admin
-                          ? u.id === myUserId
-                            ? "Wirklich? Du verlierst dann selbst den Zugriff."
-                            : "Wirklich entfernen?"
-                          : "Wirklich zum Admin machen?"
-                      }
+                      label={u.is_admin ? "Entfernen" : "Admin machen"}
+                      confirmLabel="Wirklich?"
                       danger={u.is_admin}
                       disabled={busyId === u.id}
                       onConfirm={() => toggleAdmin(u)}
@@ -208,7 +205,7 @@ export default function AdminPanel({ myUserId, onClose }) {
                       </div>
                       <ConfirmButton
                         label="Stornieren"
-                        confirmLabel="Wirklich stornieren?"
+                        confirmLabel="Wirklich?"
                         danger
                         disabled={busyId === b.id}
                         onConfirm={() => cancelBooking(b)}
