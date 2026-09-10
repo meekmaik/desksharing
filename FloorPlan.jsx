@@ -1,4 +1,5 @@
 import { GROUPS_LEFT, GROUPS_RIGHT, RESOURCES } from "./floorplanData";
+import { MEETING_SLOTS_VISIBLE } from "./config";
 
 /*
   Der komplette Grundriss ist EINE SVG-Zeichnung mit fester viewBox.
@@ -187,7 +188,8 @@ function MeetingRoom({ group, x, y, w, h, bookings, myUserId, onSelect }) {
   // Liste) -- damit bleibt die Fläche unabhängig von der Anzahl an
   // Buchungen an einem Tag immer gleich groß, ohne Termine kommentarlos
   // verschwinden zu lassen.
-  const visibleCount = allList.length > 3 ? 2 : allList.length;
+  const visibleCount =
+    allList.length > MEETING_SLOTS_VISIBLE ? MEETING_SLOTS_VISIBLE - 1 : allList.length;
   const visibleList = allList.slice(0, visibleCount);
   const hiddenCount = allList.length - visibleCount;
 

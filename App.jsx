@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { supabase, isConfigured } from "./supabaseClient";
-import { RESOURCES } from "./floorplanData";
-import { getBookingHorizon } from "./dateUtils";
+import { isConfigured } from "./supabaseClient";
+import { TOAST_MS } from "./config";
+import { useAuth } from "./useAuth";
+import { useBookings, FULLDAY_RESOURCE_COUNT } from "./useBookings";
+import { useBookingActions } from "./useBookingActions";
 
 import FloorPlan from "./FloorPlan";
 import DatePicker from "./DatePicker";
@@ -14,329 +16,64 @@ import MyBookingsPanel from "./MyBookingsPanel";
 import WhoIsInPanel from "./WhoIsInPanel";
 import AdminPanel from "./AdminPanel";
 
-const FULLDAY_RESOURCE_COUNT = RESOURCES.filter((r) => !r.timeBased).length;
+/** Kurze Rückmeldung unten am Bildschirm ("Gebucht.", "Storniert."). */
+function useToast() {
+  const [message, setMessage] = useState(null);
+  const timer = useRef(null);
 
-// crypto.randomUUID fehlt in älteren Browsern (z. B. iOS < 15.4).
-function makeUuid() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  const show = useCallback((text) => {
+    setMessage(text);
+    // Vorherigen Timer stoppen, sonst verschwindet eine neue Meldung zu
+    // früh, wenn kurz zuvor schon eine angezeigt wurde.
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setMessage(null), TOAST_MS);
+  }, []);
+
+  // Timer beim Verlassen der Seite aufräumen.
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return { message, show };
 }
 
 export default function App() {
-  const [horizon, setHorizon] = useState(() => getBookingHorizon(14));
+  const toast = useToast();
+  const auth = useAuth(toast.show);
+  const bookings = useBookings(auth.userId, toast.show);
 
-  // Bleibt der Tab über Mitternacht offen, wäre der erste Tag sonst gestern.
-  // Beim Zurückkehren zum Tab und minütlich prüfen, ob sich der Tag geändert hat.
-  useEffect(() => {
-    const refresh = () => {
-      setHorizon((prev) => {
-        const next = getBookingHorizon(14);
-        return next[0].key === prev[0].key ? prev : next;
-      });
-    };
-    const timer = setInterval(refresh, 60000);
-    window.addEventListener("focus", refresh);
-    document.addEventListener("visibilitychange", refresh);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-      document.removeEventListener("visibilitychange", refresh);
-    };
-  }, []);
-  const [session, setSession] = useState(null);
-  const [displayName, setDisplayName] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [passwordRecovery, setPasswordRecovery] = useState(false);
-  const [authNotice, setAuthNotice] = useState(null);
-
-  const [selectedDateKey, setSelectedDateKey] = useState(horizon[0].key);
-
-  // Ist der gewählte Tag aus dem Horizont gefallen (Tageswechsel), auf den
-  // ersten gültigen Tag zurückspringen.
-  useEffect(() => {
-    if (!horizon.some((d) => d.key === selectedDateKey)) {
-      setSelectedDateKey(horizon[0].key);
-    }
-  }, [horizon, selectedDateKey]);
-  const [allBookings, setAllBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [toast, setToast] = useState(null);
 
-  const toastTimer = useRef(null);
-  const showToast = (msg) => {
-    setToast(msg);
-    // Vorherigen Timer stoppen, sonst verschwindet ein neuer Toast zu früh,
-    // wenn kurz zuvor schon einer angezeigt wurde.
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
-  };
+  const closeModal = useCallback(() => setModal(null), []);
 
-  // ---- Login-Status verwalten ----
+  const actions = useBookingActions({
+    userId: auth.userId,
+    reload: bookings.reload,
+    onToast: toast.show,
+    onClose: closeModal,
+  });
+
+  // Beim Schließen auch eine noch angezeigte Fehlermeldung zurücksetzen.
+  const dismissModal = useCallback(() => {
+    closeModal();
+    actions.clearError();
+  }, [closeModal, actions]);
+
+  // Nach dem Abmelden (auch in einem anderen Tab) keine offenen Dialoge
+  // mit toten Buttons stehen lassen.
   useEffect(() => {
-    if (!supabase) {
-      setAuthLoading(false);
-      return;
-    }
+    if (!auth.session) setModal(null);
+  }, [auth.session]);
 
-    // Kommt man über einen E-Mail-Link (Bestätigung / Passwort-Reset) zurück,
-    // hängen Tokens oder ein Fehler im URL-Fragment. Das wird ausgewertet und
-    // die Adresse anschließend aufgeräumt, damit niemand auf einer leeren
-    // Seite mit kryptischer URL landet.
-    const hash = window.location.hash || "";
-    const hadAuthHash = hash.includes("access_token") || hash.includes("error");
-    if (hash.includes("error")) {
-      const params = new URLSearchParams(hash.replace(/^#/, ""));
-      const desc = params.get("error_description");
-      setAuthNotice(
-        desc?.toLowerCase().includes("expired")
-          ? "Der Link ist abgelaufen. Bitte fordere einen neuen an."
-          : "Der Link konnte nicht verarbeitet werden. Bitte versuche es erneut."
-      );
-    }
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthLoading(false);
-      if (hadAuthHash) {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setPasswordRecovery(true);
-      }
-      if (!newSession) {
-        // Nach Logout (auch in einem anderen Tab) keine offenen Dialoge
-        // mit toten Buchungs-Buttons stehen lassen.
-        setModal(null);
-      }
-      if (event === "SIGNED_IN" && hadAuthHash) {
-        setAuthNotice(null);
-        showToast("E-Mail bestätigt – willkommen!");
-      }
-      setSession(newSession);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  // ---- Anzeigenamen + Admin-Status aus dem Profil laden ----
-  // Wichtig: is_admin steuert hier NUR, ob der Admin-Button sichtbar ist.
-  // Die eigentliche Absicherung liegt in den Datenbank-Regeln (RLS) --
-  // selbst wenn jemand den Button per Entwicklertools sichtbar machen
-  // würde, käme er ohne echte Admin-Rechte in der Datenbank nicht weiter.
-  useEffect(() => {
-    if (!supabase || !session) {
-      setDisplayName("");
-      setIsAdmin(false);
-      return;
-    }
-    supabase
-      .from("profiles")
-      .select("display_name, is_admin")
-      .eq("id", session.user.id)
-      .single()
-      .then(({ data }) => {
-        setDisplayName(data?.display_name || session.user.email?.split("@")[0] || "Ich");
-        setIsAdmin(!!data?.is_admin);
-      });
-  }, [session]);
-
-  const myUserId = session?.user?.id || null;
-
-  const loadBookings = useCallback(async () => {
-    if (!supabase || !session) {
-      setLoading(false);
-      return;
-    }
-    const from = horizon[0].key;
-    const to = horizon[horizon.length - 1].key;
-    const { data, error: err } = await supabase
-      .from("bookings")
-      .select("*")
-      .gte("date", from)
-      .lte("date", to);
-    if (err) {
-      showToast("Buchungen konnten nicht geladen werden.");
-    } else {
-      setAllBookings(data || []);
-    }
-    setLoading(false);
-  }, [horizon, session]);
-
-  useEffect(() => {
-    loadBookings();
-    if (!supabase || !session) return;
-    const onFocus = () => loadBookings();
-    window.addEventListener("focus", onFocus);
-    const channel = supabase
-      .channel("bookings-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () => {
-        loadBookings();
-      })
-      .subscribe();
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      supabase.removeChannel(channel);
-    };
-  }, [loadBookings, session]);
-
-  const bookingsForSelectedDate = useMemo(() => {
-    const idx = {};
-    for (const b of allBookings) {
-      if (b.date !== selectedDateKey) continue;
-      if (!idx[b.resource_id]) idx[b.resource_id] = [];
-      idx[b.resource_id].push(b);
-    }
-    return idx;
-  }, [allBookings, selectedDateKey]);
-
-  const bookedFullDayCount = useMemo(() => {
-    return RESOURCES.filter((r) => !r.timeBased && bookingsForSelectedDate[r.id]?.length).length;
-  }, [bookingsForSelectedDate]);
-
-  // Eigene ganztägige Buchung an diesem Tag (Besprechungsraum zählt nicht,
-  // da zeitbasiert / start_time gesetzt).
-  const myFullDayBookingToday = useMemo(() => {
-    return allBookings.find(
-      (b) => b.user_id === myUserId && b.date === selectedDateKey && b.start_time === null
-    );
-  }, [allBookings, myUserId, selectedDateKey]);
-
-  // Alle Tage, an denen ich bereits irgendwo einen Platz habe. Diese Tage
-  // können in einer Serie nicht zusätzlich gebucht werden (1 Platz pro Tag).
-  const myBookedDates = useMemo(
-    () =>
-      new Set(
-        allBookings
-          .filter((b) => b.user_id === myUserId && b.start_time === null)
-          .map((b) => b.date)
-      ),
-    [allBookings, myUserId]
-  );
-
-  const openResource = (resource) => {
-    setError(null);
-    if (resource.timeBased) {
-      setModal({ type: "timed", resource });
-    } else {
-      const existing = bookingsForSelectedDate[resource.id]?.[0] || null;
-      setModal({ type: "fullday", resource, existing });
-    }
-  };
-
-  const closeModal = useCallback(() => {
-    setModal(null);
-    setError(null);
-  }, []);
-
-  // Escape schließt den offenen Dialog – erwartetes Verhalten in jeder App.
+  // Escape schließt den offenen Dialog.
   useEffect(() => {
     if (!modal) return;
-    const onKey = (e) => e.key === "Escape" && closeModal();
+    const onKey = (e) => e.key === "Escape" && dismissModal();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [modal, closeModal]);
+  }, [modal, dismissModal]);
 
-  const handleBookFullDay = async (resource, dates, name) => {
-    setBusy(true);
-    setError(null);
-    const seriesId = dates.length > 1 ? makeUuid() : null;
-    const row = (date) => ({
-      resource_id: resource.id,
-      date,
-      name,
-      user_id: myUserId,
-      series_id: seriesId,
-    });
-
-    let failed = [];
-    const { error: bulkErr } = await supabase.from("bookings").insert(dates.map(row));
-    if (bulkErr) {
-      // Mindestens ein Tag ist belegt – einzeln nachfassen, um die restlichen
-      // Tage trotzdem zu buchen und genau zu wissen, welche fehlschlagen.
-      failed = [];
-      for (const date of dates) {
-        const { error: err } = await supabase.from("bookings").insert(row(date));
-        if (err) failed.push(date);
-      }
-    }
-    setBusy(false);
-    await loadBookings();
-    if (failed.length === 0) {
-      closeModal();
-      showToast(dates.length > 1 ? `${dates.length} Tage gebucht.` : "Gebucht.");
-    } else if (failed.length === dates.length) {
-      setError("Diese(r) Termin(e) ist/sind bereits belegt.");
-    } else {
-      showToast(`${dates.length - failed.length} von ${dates.length} Tagen gebucht (Rest bereits belegt).`);
-      closeModal();
-    }
-  };
-
-  const handleCancelFullDay = async (booking, mode, keepOpen = false) => {
-    setBusy(true);
-    setError(null);
-    // Absicherung: ohne series_id würde .eq("series_id", null) ins Leere laufen.
-    const useSeries = mode === "series" && !!booking.series_id;
-    const query = supabase.from("bookings").delete();
-    const { error: err } = useSeries
-      ? await query.eq("series_id", booking.series_id)
-      : await query.eq("id", booking.id);
-    setBusy(false);
-    if (err) {
-      setError("Stornieren fehlgeschlagen. Bitte erneut versuchen.");
-      return;
-    }
-    await loadBookings();
-    if (!keepOpen) closeModal();
-    showToast(useSeries ? "Serie storniert." : "Storniert.");
-  };
-
-  const handleBookTimed = async (resource, dateKey, start, end, name) => {
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.from("bookings").insert({
-      resource_id: resource.id,
-      date: dateKey,
-      start_time: start,
-      end_time: end,
-      name,
-      user_id: myUserId,
-    });
-    setBusy(false);
-    if (err) {
-      setError(err.message?.includes("überschneidet") ? err.message : "Buchung fehlgeschlagen.");
-      return;
-    }
-    await loadBookings();
-    showToast("Termin gebucht.");
-  };
-
-  const handleCancelTimed = async (booking) => {
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.from("bookings").delete().eq("id", booking.id);
-    setBusy(false);
-    if (err) {
-      setError("Stornieren fehlgeschlagen.");
-      return;
-    }
-    await loadBookings();
-    showToast("Termin storniert.");
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const openResource = (resource) => {
+    actions.clearError();
+    setModal({ type: resource.timeBased ? "timed" : "fullday", resource });
   };
 
   if (!isConfigured) {
@@ -351,17 +88,26 @@ export default function App() {
     );
   }
 
-  if (authLoading) {
-    return <div className="loading">Lade…</div>;
-  }
+  if (auth.loading) return <div className="loading">Lade…</div>;
 
-  if (passwordRecovery) {
+  if (auth.passwordRecovery) {
     return (
       <div className="page">
-        <ResetPasswordForm onDone={() => setPasswordRecovery(false)} />
+        <ResetPasswordForm onDone={auth.endPasswordRecovery} />
       </div>
     );
   }
+
+  // Aktueller Stand des geöffneten Platzes. Bewusst bei jedem Rendern neu
+  // ermittelt statt beim Öffnen eingefroren: bucht jemand anderes den
+  // Platz, während der Dialog offen ist, zeigt er das sofort an.
+  const openBookings = modal?.resource ? bookings.byResource[modal.resource.id] || [] : [];
+  const existingBooking = openBookings[0] || null;
+
+  const myBookingElsewhere =
+    bookings.myFullDayBooking && bookings.myFullDayBooking.resource_id !== modal?.resource?.id
+      ? bookings.myFullDayBooking
+      : null;
 
   return (
     <div className="page">
@@ -370,21 +116,21 @@ export default function App() {
           <h1>Arbeitsplatz-Buchung</h1>
         </div>
         <div className="header-actions">
-          {session && (
+          {auth.session && (
             <>
-              <span className="hello">Hallo, {displayName}</span>
+              <span className="hello">Hallo, {auth.displayName}</span>
               <button className="btn-secondary" onClick={() => setModal({ type: "who-is-in" })}>
                 Wer ist da?
               </button>
               <button className="btn-secondary" onClick={() => setModal({ type: "my-bookings" })}>
                 Meine Buchungen
               </button>
-              {isAdmin && (
+              {auth.isAdmin && (
                 <button className="btn-secondary" onClick={() => setModal({ type: "admin" })}>
                   Admin-Bereich
                 </button>
               )}
-              <button className="btn-secondary" onClick={handleLogout}>
+              <button className="btn-secondary" onClick={auth.logout}>
                 Logout
               </button>
             </>
@@ -392,25 +138,33 @@ export default function App() {
         </div>
       </header>
 
-      {!session ? (
-        <AuthGate notice={authNotice} />
+      {!auth.session ? (
+        <AuthGate notice={auth.notice} />
       ) : (
         <>
-          <DatePicker horizon={horizon} selectedKey={selectedDateKey} onSelect={setSelectedDateKey} />
+          <DatePicker
+            horizon={bookings.horizon}
+            selectedKey={bookings.selectedDateKey}
+            onSelect={bookings.setSelectedDateKey}
+          />
 
           <div className="legend">
             <LegendItem status="free" text="frei" />
             <LegendItem status="booked" text="belegt" />
             <LegendItem status="mine" text="deine Buchung" />
             <span className="legend-count">
-              {bookedFullDayCount}/{FULLDAY_RESOURCE_COUNT} Plätze belegt
+              {bookings.bookedFullDayCount}/{FULLDAY_RESOURCE_COUNT} Plätze belegt
             </span>
           </div>
 
-          {loading ? (
+          {bookings.loading ? (
             <div className="loading">Lade Grundriss…</div>
           ) : (
-            <FloorPlan bookings={bookingsForSelectedDate} myUserId={myUserId} onSelect={openResource} />
+            <FloorPlan
+              bookings={bookings.byResource}
+              myUserId={auth.userId}
+              onSelect={openResource}
+            />
           )}
         </>
       )}
@@ -418,63 +172,59 @@ export default function App() {
       {modal?.type === "fullday" && (
         <BookingModal
           resource={modal.resource}
-          dateKey={selectedDateKey}
-          horizon={horizon}
-          existingBooking={modal.existing}
-          myExistingElsewhere={
-            myFullDayBookingToday && myFullDayBookingToday.resource_id !== modal.resource.id
-              ? myFullDayBookingToday
-              : null
-          }
-          myBookedDates={myBookedDates}
-          myUserId={myUserId}
-          myName={displayName}
-          busy={busy}
-          error={error}
-          onClose={closeModal}
-          onBook={handleBookFullDay}
-          onCancel={handleCancelFullDay}
+          dateKey={bookings.selectedDateKey}
+          horizon={bookings.horizon}
+          existingBooking={existingBooking}
+          myExistingElsewhere={myBookingElsewhere}
+          myBookedDates={bookings.myBookedDates}
+          myUserId={auth.userId}
+          myName={auth.displayName}
+          busy={actions.busy}
+          error={actions.error}
+          onClose={dismissModal}
+          onBook={actions.bookFullDay}
+          onCancel={actions.cancelFullDay}
         />
       )}
 
       {modal?.type === "timed" && (
         <MeetingRoomModal
           resource={modal.resource}
-          dateKey={selectedDateKey}
-          entries={bookingsForSelectedDate[modal.resource.id] || []}
-          myUserId={myUserId}
-          myName={displayName}
-          busy={busy}
-          error={error}
-          onClose={closeModal}
-          onBook={handleBookTimed}
-          onCancel={handleCancelTimed}
+          dateKey={bookings.selectedDateKey}
+          entries={openBookings}
+          myUserId={auth.userId}
+          myName={auth.displayName}
+          busy={actions.busy}
+          error={actions.error}
+          onClose={dismissModal}
+          onBook={actions.bookTimed}
+          onCancel={actions.cancelTimed}
         />
       )}
 
       {modal?.type === "who-is-in" && (
         <WhoIsInPanel
-          bookingsForDate={bookingsForSelectedDate}
-          dateKey={selectedDateKey}
-          onClose={closeModal}
+          bookingsForDate={bookings.byResource}
+          dateKey={bookings.selectedDateKey}
+          onClose={dismissModal}
         />
       )}
 
       {modal?.type === "my-bookings" && (
         <MyBookingsPanel
-          allBookings={allBookings}
-          myUserId={myUserId}
-          busy={busy}
-          onCancel={(b, mode) => handleCancelFullDay(b, mode, true)}
-          onClose={closeModal}
+          allBookings={bookings.allBookings}
+          myUserId={auth.userId}
+          busy={actions.busy}
+          onCancel={(booking, mode) => actions.cancelFullDay(booking, mode, true)}
+          onClose={dismissModal}
         />
       )}
 
-      {modal?.type === "admin" && isAdmin && (
-        <AdminPanel myUserId={myUserId} onClose={closeModal} />
+      {modal?.type === "admin" && auth.isAdmin && (
+        <AdminPanel myUserId={auth.userId} onClose={dismissModal} />
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {toast.message && <div className="toast">{toast.message}</div>}
     </div>
   );
 }

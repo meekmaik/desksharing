@@ -1,6 +1,6 @@
-// Zentrales Datenmodell für den Grundriss "Raum 3.5".
-// Möchtest du später Tische/Räume ändern, ist HIER die einzige Stelle, die
-// angepasst werden muss (Layout in FloorPlan.jsx bleibt unverändert).
+// Zentrales Datenmodell für den Grundriss.
+// Möchtest du später Tische/Räume ändern, ist HIER die einzige Stelle,
+// die angepasst werden muss.
 
 export const GROUPS_LEFT = [
   { id: "L1", label: "Gruppe 1", kind: "desk-group", flex: 1, desks: 4 },
@@ -22,7 +22,7 @@ export const GROUPS_RIGHT = [
   { id: "OFF_L", label: "Büro (groß)", kind: "room-fullday", flex: 1.3, desks: 1 },
 ];
 
-// Flache Liste aller einzelnen buchbaren Einheiten (= Zeilen in der DB-Tabelle "resources")
+// Flache Liste aller einzeln buchbaren Einheiten (resource_id in der Tabelle "bookings")
 export function buildResourceList() {
   const list = [];
   const addGroup = (group) => {
@@ -45,6 +45,11 @@ export function buildResourceList() {
 
 export const RESOURCES = buildResourceList();
 
+// Nachschlagetabelle statt linearer Suche: getResource() wird beim
+// Zeichnen des Grundrisses für jeden Platz einzeln aufgerufen.
+const RESOURCE_BY_ID = new Map(RESOURCES.map((r) => [r.id, r]));
+
+/** Liefert die Platz-Definition zu einer resource_id, oder undefined. */
 export function getResource(id) {
-  return RESOURCES.find((r) => r.id === id);
+  return RESOURCE_BY_ID.get(id);
 }

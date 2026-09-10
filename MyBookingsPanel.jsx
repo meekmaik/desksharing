@@ -1,5 +1,6 @@
 import { getResource } from "./floorplanData";
 import { formatDateLong } from "./dateUtils";
+import { BOOKING_DAYS } from "./config";
 
 export default function MyBookingsPanel({ allBookings, myUserId, busy, onCancel, onClose }) {
   const mine = allBookings
@@ -8,11 +9,13 @@ export default function MyBookingsPanel({ allBookings, myUserId, busy, onCancel,
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Meine Buchungen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">Meine Buchungen</div>
 
         {mine.length === 0 ? (
-          <p className="modal-hint">Du hast aktuell keine Buchungen in den nächsten 14 Tagen.</p>
+          <p className="modal-hint">
+            Du hast aktuell keine Buchungen in den nächsten {BOOKING_DAYS} Werktagen.
+          </p>
         ) : (
           <div className="my-bookings-list">
             {mine.map((b) => {

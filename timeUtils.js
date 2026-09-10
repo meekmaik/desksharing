@@ -1,6 +1,8 @@
 // Zeit-Hilfsfunktionen für den Besprechungsraum, bewusst als reine
 // Funktionen ausgelagert, damit sie unabhängig testbar sind.
 
+import { DEFAULT_MEETING_MINUTES } from "./config";
+
 const DAY_END = 24 * 60 - 1; // 23:59
 
 // "09:30" -> 570. Ungültige Eingaben ergeben null.
@@ -34,7 +36,12 @@ export function formatDuration(mins) {
  * Die bisher eingestellte Dauer bleibt erhalten (Standard: 60 Minuten),
  * damit die Endzeit nie vor der Startzeit landet.
  */
-export function endAfterStartChange(oldStart, oldEnd, newStart, defaultMinutes = 60) {
+export function endAfterStartChange(
+  oldStart,
+  oldEnd,
+  newStart,
+  defaultMinutes = DEFAULT_MEETING_MINUTES
+) {
   const prev = minutesOf(oldStart);
   const prevEnd = minutesOf(oldEnd);
   const next = minutesOf(newStart);
